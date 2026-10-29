@@ -48,6 +48,16 @@ def test_new_game_route_generates_and_stores_puzzle(
     assert app.CURRENT == {"puzzle": puzzle, "solution": solution}
 
 
+@pytest.mark.parametrize("query", ["?clues=invalid", "?clues=-1", "?clues=82"])
+def test_new_game_route_returns_a_json_error_for_invalid_clue_count(client, query):
+    response = client.get(f"/new{query}")
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "Clues must be an integer between 0 and 81"
+    }
+
+
 def test_check_route_returns_bad_request_when_no_game_is_in_progress(client):
     response = client.post("/check", json={"board": sudoku_logic.create_empty_board()})
 
@@ -76,3 +86,32 @@ def test_check_route_returns_no_incorrect_cells_for_matching_solution(client):
 
     assert response.status_code == 200
     assert response.get_json() == {"incorrect": []}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"board": [[0] * sudoku_logic.SIZE]},
+        {
+            "board": [[True] + [0] * (sudoku_logic.SIZE - 1)]
+            + [[0] * sudoku_logic.SIZE] * (sudoku_logic.SIZE - 1)
+        },
+    ],
+)
+def test_check_route_returns_a_json_error_for_invalid_board(client, payload):
+    app.CURRENT["solution"] = sudoku_logic.create_empty_board()
+
+    response = client.post("/check", json=payload)
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "Board must be a 9x9 grid containing integers from 0 to 9"
+    }
+
+
+def test_check_route_returns_a_json_error_for_invalid_json_body(client):
+    response = client.post("/check", data="{")
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "Request body must be a JSON object"}
