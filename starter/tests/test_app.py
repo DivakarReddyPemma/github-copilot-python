@@ -26,7 +26,16 @@ def test_index_route_renders_game_page(client):
     assert response.mimetype == "text/html"
 
 
-@pytest.mark.parametrize(("query", "expected_clues"), [("", 35), ("?clues=40", 40)])
+@pytest.mark.parametrize(
+    ("query", "expected_clues"),
+    [
+        ("", 35),
+        ("?clues=40", 40),
+        ("?difficulty=easy", 40),
+        ("?difficulty=medium", 32),
+        ("?difficulty=hard", 26),
+    ],
+)
 def test_new_game_route_generates_and_stores_puzzle(
     client, monkeypatch, query, expected_clues
 ):
@@ -46,6 +55,13 @@ def test_new_game_route_generates_and_stores_puzzle(
     assert response.get_json() == {"puzzle": puzzle}
     assert generated_arguments == [expected_clues]
     assert app.CURRENT == {"puzzle": puzzle, "solution": solution}
+
+
+def test_new_game_route_rejects_unknown_difficulty(client):
+    response = client.get("/new?difficulty=expert")
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "Difficulty must be easy, medium, or hard"}
 
 
 @pytest.mark.parametrize("query", ["?clues=invalid", "?clues=-1", "?clues=82"])

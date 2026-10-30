@@ -1,5 +1,7 @@
 import copy
 
+import pytest
+
 import sudoku_logic
 
 
@@ -74,6 +76,34 @@ def test_is_safe_rejects_values_present_in_row_column_or_box():
     assert not sudoku_logic.is_safe(box_conflict, 0, 0, 5)
 
 
+def test_count_solutions_returns_one_for_a_uniquely_solvable_puzzle():
+    puzzle = [
+        [5, 3, 0, 0, 7, 0, 0, 0, 0],
+        [6, 0, 0, 1, 9, 5, 0, 0, 0],
+        [0, 9, 8, 0, 0, 0, 0, 6, 0],
+        [8, 0, 0, 0, 6, 0, 0, 0, 3],
+        [4, 0, 0, 8, 0, 3, 0, 0, 1],
+        [7, 0, 0, 0, 2, 0, 0, 0, 6],
+        [0, 6, 0, 0, 0, 0, 2, 8, 0],
+        [0, 0, 0, 4, 1, 9, 0, 0, 5],
+        [0, 0, 0, 0, 8, 0, 0, 7, 9],
+    ]
+
+    assert sudoku_logic.count_solutions(puzzle) == 1
+    assert puzzle[0][2] == sudoku_logic.EMPTY
+
+
+def test_count_solutions_stops_at_two_for_a_puzzle_with_multiple_solutions():
+    assert sudoku_logic.count_solutions(sudoku_logic.create_empty_board()) == 2
+
+
+def test_count_solutions_returns_zero_for_conflicting_givens():
+    puzzle = copy.deepcopy(SOLVED_BOARD)
+    puzzle[0][0] = puzzle[0][1]
+
+    assert sudoku_logic.count_solutions(puzzle) == 0
+
+
 def test_fill_board_completes_puzzle_without_changing_given_values():
     puzzle = copy.deepcopy(SOLVED_BOARD)
     puzzle[0][0] = sudoku_logic.EMPTY
@@ -98,6 +128,7 @@ def test_remove_cells_leaves_the_requested_number_of_clues():
     sudoku_logic.remove_cells(board, clues=30)
 
     assert sum(value != sudoku_logic.EMPTY for row in board for value in row) == 30
+    assert sudoku_logic.count_solutions(board) == 1
 
 
 def test_generate_puzzle_returns_consistent_puzzle_and_valid_solution():
@@ -112,3 +143,13 @@ def test_generate_puzzle_returns_consistent_puzzle_and_valid_solution():
         for row in range(sudoku_logic.SIZE)
         for col in range(sudoku_logic.SIZE)
     )
+    assert sudoku_logic.count_solutions(puzzle) == 1
+
+
+@pytest.mark.parametrize("difficulty", ["easy", "medium", "hard"])
+def test_generated_difficulty_puzzles_have_unique_solutions(difficulty):
+    puzzle, _ = sudoku_logic.generate_puzzle(
+        clues=sudoku_logic.DIFFICULTY_CLUES[difficulty]
+    )
+
+    assert sudoku_logic.count_solutions(puzzle) == 1

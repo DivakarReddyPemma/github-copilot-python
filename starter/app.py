@@ -45,11 +45,22 @@ def index():
 
 @app.route("/new")
 def new_game():
-    """Create and store a puzzle, using 35 clues unless specified."""
-    try:
-        clues = int(request.args.get("clues", 35))
-    except (TypeError, ValueError):
-        return _error_response("Clues must be an integer between 0 and 81")
+    """Create and store a puzzle for the selected difficulty."""
+    difficulty = request.args.get("difficulty")
+    if difficulty is not None:
+        difficulty = difficulty.lower()
+        if difficulty not in sudoku_logic.DIFFICULTY_CLUES:
+            return _error_response("Difficulty must be easy, medium, or hard")
+        clues = sudoku_logic.DIFFICULTY_CLUES[difficulty]
+    else:
+        raw_clues = request.args.get("clues")
+        if raw_clues is None:
+            clues = 35
+        else:
+            try:
+                clues = int(raw_clues)
+            except (TypeError, ValueError):
+                return _error_response("Clues must be an integer between 0 and 81")
 
     if not 0 <= clues <= sudoku_logic.SIZE * sudoku_logic.SIZE:
         return _error_response("Clues must be an integer between 0 and 81")

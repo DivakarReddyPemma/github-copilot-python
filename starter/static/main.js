@@ -1,4 +1,4 @@
-// Client-side rendering and interaction for the Flask-backed Sudoku
+// Client-side rendering and interaction for the Flask-backed Sudoku.
 const SIZE = 9;
 let puzzle = [];
 
@@ -12,9 +12,11 @@ function createBoardElement() {
       const input = document.createElement('input');
       input.type = 'text';
       input.maxLength = 1;
+      input.inputMode = 'numeric';
       input.className = 'sudoku-cell';
       input.dataset.row = i;
       input.dataset.col = j;
+      input.setAttribute('aria-label', `Row ${i + 1}, column ${j + 1}`);
       input.addEventListener('input', (e) => {
         const val = e.target.value.replace(/[^1-9]/g, '');
         e.target.value = val;
@@ -37,21 +39,32 @@ function renderPuzzle(puz) {
       const inp = inputs[idx];
       if (val !== 0) {
         inp.value = val;
-        inp.disabled = true;
-        inp.className += ' prefilled';
+        inp.readOnly = true;
+        inp.classList.add('prefilled');
       } else {
         inp.value = '';
-        inp.disabled = false;
+        inp.readOnly = false;
+        inp.classList.remove('prefilled');
       }
     }
   }
 }
 
 async function newGame() {
-  const res = await fetch('/new');
-  const data = await res.json();
-  renderPuzzle(data.puzzle);
-  document.getElementById('message').innerText = '';
+  const message = document.getElementById('message');
+  try {
+    const difficulty = document.getElementById('difficulty').value;
+    const res = await fetch(`/new?difficulty=${encodeURIComponent(difficulty)}`);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Unable to start a new game.');
+    }
+    renderPuzzle(data.puzzle);
+    message.innerText = '';
+  } catch (error) {
+    message.className = 'error';
+    message.innerText = error.message;
+  }
 }
 
 async function checkSolution() {
@@ -73,33 +86,31 @@ async function checkSolution() {
   });
   const data = await res.json();
   const msg = document.getElementById('message');
-  if (data.error) {
-    msg.style.color = '#d32f2f';
+  if (!res.ok || data.error) {
+    msg.className = 'error';
     msg.innerText = data.error;
     return;
   }
   const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
-    if (inp.disabled) continue;
-    inp.className = 'sudoku-cell';
+    if (puzzle[Math.floor(idx / SIZE)][idx % SIZE] !== 0) continue;
+    inp.classList.remove('incorrect');
     if (incorrect.has(idx)) {
-      inp.className = 'sudoku-cell incorrect';
+      inp.classList.add('incorrect');
     }
   }
   if (incorrect.size === 0) {
-    msg.style.color = '#388e3c';
+    msg.className = 'success';
     msg.innerText = 'Congratulations! You solved it!';
   } else {
-    msg.style.color = '#d32f2f';
+    msg.className = 'error';
     msg.innerText = 'Some cells are incorrect.';
   }
 }
 
-// Wire buttons
 window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
-  // initialize
   newGame();
 });

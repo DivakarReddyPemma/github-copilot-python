@@ -48,9 +48,11 @@ Use GitHub Copilot to refactor the code for this game to add more advanced featu
 
 - Errors should be handled gracefully with appropriate messages to the user.
 - Implement a Sudoku board generator that creates a valid Sudoku puzzle with a unique solution.
+- Keep each generated puzzle uniquely solvable by checking each tentative clue removal with a solution-counting solver.
 - Add a timer to track how long it takes to solve the puzzle.
 - Implement a solution checker that verifies if the user's solution is correct using event delegation.
 - Add a difficulty selector to allow users to choose between easy, medium, and hard puzzles.
+- Target about 40, 32, and 26 prefilled clues for Easy, Medium, and Hard respectively; cells supplied by the puzzle are read-only.
 - Add a hint feature that provides clues for the user that are noted with unique colors.
 - Add a check puzzle button that checks the current state of the board against the solution.
 - User should get immediate feedback on their input, such as highlighting invalid entries.
