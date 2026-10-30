@@ -64,3 +64,25 @@ Use GitHub Copilot to refactor the code for this game to add more advanced featu
 ## Running the tests
 cd starter 
 python -m pytest
+
+## How to run the app
+1. cd starter
+2. python -m venv .venv
+3. .venv\Scripts\activate   (Windows)
+4. pip install -r requirements.txt
+5. python app.py
+6. Open http://127.0.0.1:5000 in Chrome
+
+## Running the tests
+cd starter
+python -m pytest
+
+## Features
+- Difficulty selector (Easy, Medium, Hard) with unique-solution puzzles
+- Locked prefilled cells, live conflict highlighting, completion message
+- Check and Hint buttons, timer
+- Top 10 fastest times saved in localStorage
+- Dark/light mode toggle, responsive layout, alternating 3x3 colors
+
+## Copilot usage
+Screenshots of my Copilot prompts and responses are in the Screenshots folder.
