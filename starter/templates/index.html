@@ -8,8 +8,19 @@
 </head>
 <body>
   <main class="game">
-    <h1>Sudoku Game</h1>
+    <header class="page-header">
+      <h1>Sudoku Game</h1>
+      <button id="theme-toggle" type="button" aria-label="Toggle dark mode" aria-pressed="false">Dark mode</button>
+    </header>
     <div id="sudoku-board" aria-label="Sudoku puzzle"></div>
+    <form id="score-form" class="score-entry" aria-labelledby="score-entry-title" hidden>
+      <h2 id="score-entry-title">Save your time</h2>
+      <label for="player-name">Name</label>
+      <div class="score-entry-controls">
+        <input id="player-name" name="playerName" type="text" maxlength="40" autocomplete="name" required>
+        <button type="submit">Save</button>
+      </div>
+    </form>
     <div class="controls">
       <label for="difficulty">Difficulty</label>
       <select id="difficulty" name="difficulty">
@@ -26,6 +37,23 @@
       <p>Hints used: <span id="hints-used">0</span></p>
     </div>
     <p id="message" role="status" aria-live="polite"></p>
+    <section class="leaderboard" aria-labelledby="leaderboard-title">
+      <h2 id="leaderboard-title">Top 10 fastest times</h2>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Rank</th>
+              <th scope="col">Player</th>
+              <th scope="col">Time</th>
+              <th scope="col">Difficulty</th>
+              <th scope="col">Hints</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
   <script src="/static/main.js"></script>
 </body>

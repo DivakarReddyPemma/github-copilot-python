@@ -1,10 +1,15 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku.
 const SIZE = 9;
+const SCORE_STORAGE_KEY = 'sudokuTopTimes';
+const THEME_STORAGE_KEY = 'sudokuTheme';
+const MAX_SCORES = 10;
 let puzzle = [];
 let timerInterval = null;
 let startedAt = null;
 let hintsUsed = 0;
 let gameFinished = false;
+let currentDifficulty = 'medium';
+let completedSeconds = null;
 
 function getBoard() {
   const inputs = document.querySelectorAll('.sudoku-cell');
@@ -58,6 +63,126 @@ function formatTime(seconds) {
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
   const remainder = (seconds % 60).toString().padStart(2, '0');
   return `${minutes}:${remainder}`;
+}
+
+function getScores() {
+  const savedScores = localStorage.getItem(SCORE_STORAGE_KEY);
+  if (savedScores === null) return [];
+
+  let scores;
+  try {
+    scores = JSON.parse(savedScores);
+  } catch {
+    throw new Error('Saved times could not be read from this browser.');
+  }
+
+  const isValidScore = (score) => (
+    score
+    && typeof score.name === 'string'
+    && score.name.trim() !== ''
+    && Number.isSafeInteger(score.seconds)
+    && score.seconds >= 0
+    && ['easy', 'medium', 'hard'].includes(score.difficulty)
+    && Number.isSafeInteger(score.hints)
+    && score.hints >= 0
+  );
+  if (!Array.isArray(scores) || !scores.every(isValidScore)) {
+    throw new Error('Saved times contain invalid data and could not be displayed.');
+  }
+  return scores;
+}
+
+function renderLeaderboard() {
+  const scores = getScores()
+    .sort((first, second) => first.seconds - second.seconds)
+    .slice(0, MAX_SCORES);
+  const body = document.getElementById('leaderboard-body');
+  body.replaceChildren();
+
+  if (scores.length === 0) {
+    const row = body.insertRow();
+    const cell = row.insertCell();
+    cell.colSpan = 5;
+    cell.textContent = 'No times yet. Solve a puzzle to set the first one.';
+    cell.className = 'empty-leaderboard';
+    return;
+  }
+
+  scores.forEach((score, index) => {
+    const row = body.insertRow();
+    [
+      String(index + 1),
+      score.name,
+      formatTime(score.seconds),
+      score.difficulty[0].toUpperCase() + score.difficulty.slice(1),
+      String(score.hints)
+    ].forEach((value) => {
+      row.insertCell().textContent = value;
+    });
+  });
+}
+
+function saveScore(name, seconds) {
+  const scores = getScores();
+  scores.push({
+    name,
+    seconds,
+    difficulty: currentDifficulty,
+    hints: hintsUsed
+  });
+  scores.sort((first, second) => first.seconds - second.seconds);
+  localStorage.setItem(SCORE_STORAGE_KEY, JSON.stringify(scores.slice(0, MAX_SCORES)));
+  renderLeaderboard();
+}
+
+function submitScore(event) {
+  event.preventDefault();
+  const nameInput = document.getElementById('player-name');
+  const playerName = nameInput.value.trim();
+  if (!playerName) {
+    nameInput.setCustomValidity('Enter a name to save your time.');
+    nameInput.reportValidity();
+    return;
+  }
+  if (completedSeconds === null) {
+    showError(new Error('No completed time is available to save.'));
+    return;
+  }
+
+  try {
+    saveScore(playerName, completedSeconds);
+    document.getElementById('score-form').hidden = true;
+    nameInput.value = '';
+    const message = document.getElementById('message');
+    message.className = 'success';
+    message.innerText = `Congratulations, ${playerName}! You solved it in ${formatTime(completedSeconds)} with ${hintsUsed} hints used.`;
+  } catch (error) {
+    showError(error);
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const toggle = document.getElementById('theme-toggle');
+  const isDark = theme === 'dark';
+  toggle.textContent = 'Dark mode';
+  toggle.setAttribute('aria-pressed', String(isDark));
+}
+
+function initializeTheme() {
+  let theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+  applyTheme(theme);
+
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+  if (savedTheme !== null) {
+    if (!['light', 'dark'].includes(savedTheme)) {
+      throw new Error('The saved color theme is invalid.');
+    }
+    theme = savedTheme;
+    applyTheme(theme);
+  }
 }
 
 function updateTimer() {
@@ -140,6 +265,9 @@ function renderPuzzle(puz) {
     }
   }
   gameFinished = false;
+  completedSeconds = null;
+  document.getElementById('score-form').hidden = true;
+  document.getElementById('player-name').value = '';
   clearCellFeedback();
 }
 
@@ -153,6 +281,7 @@ async function newGame() {
       throw new Error(data.error || 'Unable to start a new game.');
     }
     renderPuzzle(data.puzzle);
+    currentDifficulty = difficulty;
     hintsUsed = 0;
     document.getElementById('hints-used').innerText = '0';
     startTimer();
@@ -186,12 +315,15 @@ async function checkSolution() {
     const message = document.getElementById('message');
     if (complete && incorrect.size === 0) {
       if (!gameFinished) {
+        completedSeconds = Math.floor((Date.now() - startedAt) / 1000);
         stopTimer();
         gameFinished = true;
         inputs.forEach((input) => { input.disabled = true; });
+        document.getElementById('score-form').hidden = false;
+        document.getElementById('player-name').focus();
+        message.innerText = `Congratulations! You solved it in ${formatTime(completedSeconds)} with ${hintsUsed} hints used. Enter your name to save your time.`;
       }
       message.className = 'success';
-      message.innerText = `Congratulations! You solved it in ${document.getElementById('timer').innerText} with ${hintsUsed} hints used.`;
     } else {
       message.className = incorrect.size ? 'error' : '';
       message.innerText = incorrect.size ? 'Some cells are incorrect.' : 'No incorrect entries found yet.';
@@ -235,5 +367,28 @@ window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   document.getElementById('get-hint').addEventListener('click', useHint);
+  document.getElementById('score-form').addEventListener('submit', submitScore);
+  document.getElementById('player-name').addEventListener('input', (event) => {
+    event.target.setCustomValidity('');
+  });
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      applyTheme(theme);
+    } catch (error) {
+      showError(new Error(`Unable to save the color theme: ${error.message}`));
+    }
+  });
+  try {
+    initializeTheme();
+  } catch (error) {
+    showError(error);
+  }
+  try {
+    renderLeaderboard();
+  } catch (error) {
+    showError(error);
+  }
   newGame();
 });

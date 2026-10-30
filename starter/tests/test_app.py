@@ -24,6 +24,10 @@ def test_index_route_renders_game_page(client):
 
     assert response.status_code == 200
     assert response.mimetype == "text/html"
+    assert b'<form id="score-form"' in response.data
+    assert b'aria-labelledby="score-entry-title" hidden' in response.data
+    assert b'id="player-name"' in response.data
+    assert b'<button type="submit">Save</button>' in response.data
 
 
 @pytest.mark.parametrize(
