@@ -86,3 +86,6 @@ python -m pytest
 
 ## Copilot usage
 Screenshots of my Copilot prompts and responses are in the Screenshots folder.
+
+## Copilot instructions
+See `instruction.md` (also copied to `.github/copilot-instructions.md`) for the rules Copilot follows in this project.
