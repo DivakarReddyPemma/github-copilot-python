@@ -11,6 +11,7 @@
     --button: #1976d2;
     --button-hover: #1565c0;
     --incorrect: #ffcdd2;
+    --hint: #bbdefb;
     --error: #d32f2f;
     --success: #388e3c;
 }
@@ -28,6 +29,7 @@
         --button: #287ec9;
         --button-hover: #3690df;
         --incorrect: #652f35;
+        --hint: #264b68;
         --error: #ff7777;
         --success: #79d28a;
     }
@@ -89,6 +91,29 @@ h1 {
 
 .sudoku-cell.incorrect {
     background: var(--incorrect);
+}
+
+.sudoku-cell.conflict {
+    background: var(--incorrect);
+    color: var(--error);
+}
+
+.sudoku-cell.hint {
+    background: var(--hint);
+    color: var(--button);
+    font-weight: bold;
+    cursor: default;
+}
+
+.game-stats {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    font-weight: bold;
+}
+
+.game-stats p {
+    margin: 0;
 }
 
 .sudoku-cell:nth-child(3),

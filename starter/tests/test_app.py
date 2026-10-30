@@ -94,6 +94,17 @@ def test_check_route_returns_coordinates_of_incorrect_cells(client):
     assert response.get_json() == {"incorrect": [[0, 2], [8, 7]]}
 
 
+def test_check_route_ignores_empty_cells(client):
+    app.CURRENT["solution"] = copy.deepcopy(sudoku_logic.create_empty_board())
+    app.CURRENT["solution"][0][0] = 1
+    board = sudoku_logic.create_empty_board()
+
+    response = client.post("/check", json={"board": board})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"incorrect": []}
+
+
 def test_check_route_returns_no_incorrect_cells_for_matching_solution(client):
     solution = [[1 for _ in range(sudoku_logic.SIZE)] for _ in range(sudoku_logic.SIZE)]
     app.CURRENT["solution"] = solution
@@ -102,6 +113,30 @@ def test_check_route_returns_no_incorrect_cells_for_matching_solution(client):
 
     assert response.status_code == 200
     assert response.get_json() == {"incorrect": []}
+
+
+def test_hint_route_returns_one_correct_empty_non_given_cell(client):
+    solution = [[1 for _ in range(sudoku_logic.SIZE)] for _ in range(sudoku_logic.SIZE)]
+    puzzle = copy.deepcopy(solution)
+    puzzle[0][0] = sudoku_logic.EMPTY
+    app.CURRENT["puzzle"] = puzzle
+    app.CURRENT["solution"] = solution
+
+    response = client.post("/hint", json={"board": copy.deepcopy(puzzle)})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"hint": {"row": 0, "col": 0, "value": 1}}
+
+
+def test_hint_route_rejects_requests_when_no_empty_cells_are_available(client):
+    solution = [[1 for _ in range(sudoku_logic.SIZE)] for _ in range(sudoku_logic.SIZE)]
+    app.CURRENT["puzzle"] = copy.deepcopy(solution)
+    app.CURRENT["solution"] = solution
+
+    response = client.post("/hint", json={"board": copy.deepcopy(solution)})
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "No empty cells available for a hint"}
 
 
 @pytest.mark.parametrize(

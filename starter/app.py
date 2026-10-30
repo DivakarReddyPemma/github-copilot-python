@@ -87,12 +87,31 @@ def check_solution():
             "Board must be a 9x9 grid containing integers from 0 to 9"
         )
 
-    incorrect = []
-    for i in range(sudoku_logic.SIZE):
-        for j in range(sudoku_logic.SIZE):
-            if board[i][j] != solution[i][j]:
-                incorrect.append([i, j])
+    incorrect = sudoku_logic.find_incorrect_cells(board, solution)
     return jsonify({"incorrect": incorrect})
+
+
+@app.route("/hint", methods=["POST"])
+def get_hint():
+    """Return one correct value for an empty, non-given cell."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return _error_response("Request body must be a JSON object")
+
+    board = data.get("board")
+    puzzle = CURRENT.get("puzzle")
+    solution = CURRENT.get("solution")
+    if puzzle is None or solution is None:
+        return _error_response("No game in progress")
+    if not _is_valid_board(board):
+        return _error_response(
+            "Board must be a 9x9 grid containing integers from 0 to 9"
+        )
+
+    hint = sudoku_logic.find_hint(board, puzzle, solution)
+    if hint is None:
+        return _error_response("No empty cells available for a hint")
+    return jsonify({"hint": hint})
 
 
 if __name__ == "__main__":

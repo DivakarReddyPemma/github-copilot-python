@@ -1,6 +1,89 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku.
 const SIZE = 9;
 let puzzle = [];
+let timerInterval = null;
+let startedAt = null;
+let hintsUsed = 0;
+let gameFinished = false;
+
+function getBoard() {
+  const inputs = document.querySelectorAll('.sudoku-cell');
+  return Array.from({length: SIZE}, (_, row) =>
+    Array.from({length: SIZE}, (_, col) => {
+      const value = inputs[row * SIZE + col].value;
+      return value ? Number.parseInt(value, 10) : 0;
+    })
+  );
+}
+
+function clearCellFeedback() {
+  document.querySelectorAll('.sudoku-cell').forEach((input) => {
+    input.classList.remove('conflict', 'incorrect');
+  });
+}
+
+function updateConflicts() {
+  const inputs = document.querySelectorAll('.sudoku-cell');
+  const board = getBoard();
+  const conflicts = new Set();
+
+  // Compare each filled cell with peers in its row, column, and 3x3 box.
+  for (let row = 0; row < SIZE; row++) {
+    for (let col = 0; col < SIZE; col++) {
+      const value = board[row][col];
+      if (!value) continue;
+
+      for (let otherRow = 0; otherRow < SIZE; otherRow++) {
+        for (let otherCol = 0; otherCol < SIZE; otherCol++) {
+          if (otherRow === row && otherCol === col) continue;
+          const sameRow = otherRow === row;
+          const sameColumn = otherCol === col;
+          const sameBox = Math.floor(otherRow / 3) === Math.floor(row / 3)
+            && Math.floor(otherCol / 3) === Math.floor(col / 3);
+          if ((sameRow || sameColumn || sameBox) && board[otherRow][otherCol] === value) {
+            conflicts.add(row * SIZE + col);
+            conflicts.add(otherRow * SIZE + otherCol);
+          }
+        }
+      }
+    }
+  }
+
+  inputs.forEach((input, index) => {
+    input.classList.toggle('conflict', conflicts.has(index));
+  });
+}
+
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainder = (seconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${remainder}`;
+}
+
+function updateTimer() {
+  if (startedAt === null) return;
+  const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+  document.getElementById('timer').innerText = formatTime(elapsed);
+}
+
+function startTimer() {
+  if (timerInterval !== null) clearInterval(timerInterval);
+  startedAt = Date.now();
+  document.getElementById('timer').innerText = '00:00';
+  timerInterval = setInterval(updateTimer, 1000);
+}
+
+function stopTimer() {
+  updateTimer();
+  if (timerInterval !== null) clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function showError(error) {
+  const message = document.getElementById('message');
+  message.className = 'error';
+  message.innerText = error.message;
+}
 
 function createBoardElement() {
   const boardDiv = document.getElementById('sudoku-board');
@@ -17,9 +100,16 @@ function createBoardElement() {
       input.dataset.row = i;
       input.dataset.col = j;
       input.setAttribute('aria-label', `Row ${i + 1}, column ${j + 1}`);
-      input.addEventListener('input', (e) => {
-        const val = e.target.value.replace(/[^1-9]/g, '');
-        e.target.value = val;
+      input.addEventListener('input', (event) => {
+        const val = event.target.value.replace(/[^1-9]/g, '');
+        event.target.value = val;
+        clearCellFeedback();
+        updateConflicts();
+        document.getElementById('message').innerText = '';
+        document.getElementById('message').className = '';
+        if (getBoard().every((row) => row.every((value) => value !== 0))) {
+          checkSolution();
+        }
       });
       rowDiv.appendChild(input);
     }
@@ -44,10 +134,13 @@ function renderPuzzle(puz) {
       } else {
         inp.value = '';
         inp.readOnly = false;
-        inp.classList.remove('prefilled');
+        inp.disabled = false;
+        inp.classList.remove('prefilled', 'hint');
       }
     }
   }
+  gameFinished = false;
+  clearCellFeedback();
 }
 
 async function newGame() {
@@ -60,57 +153,87 @@ async function newGame() {
       throw new Error(data.error || 'Unable to start a new game.');
     }
     renderPuzzle(data.puzzle);
+    hintsUsed = 0;
+    document.getElementById('hints-used').innerText = '0';
+    startTimer();
     message.innerText = '';
+    message.className = '';
   } catch (error) {
-    message.className = 'error';
-    message.innerText = error.message;
+    showError(error);
   }
 }
 
 async function checkSolution() {
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  const board = [];
-  for (let i = 0; i < SIZE; i++) {
-    board[i] = [];
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = inputs[idx].value;
-      board[i][j] = val ? parseInt(val, 10) : 0;
+  try {
+    const board = getBoard();
+    const res = await fetch('/check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({board})
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Unable to check this puzzle.');
     }
-  }
-  const res = await fetch('/check', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({board})
-  });
-  const data = await res.json();
-  const msg = document.getElementById('message');
-  if (!res.ok || data.error) {
-    msg.className = 'error';
-    msg.innerText = data.error;
-    return;
-  }
-  const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
-  for (let idx = 0; idx < inputs.length; idx++) {
-    const inp = inputs[idx];
-    if (puzzle[Math.floor(idx / SIZE)][idx % SIZE] !== 0) continue;
-    inp.classList.remove('incorrect');
-    if (incorrect.has(idx)) {
-      inp.classList.add('incorrect');
+
+    const incorrect = new Set(data.incorrect.map(([row, col]) => row * SIZE + col));
+    const inputs = document.querySelectorAll('.sudoku-cell');
+    inputs.forEach((input, index) => {
+      input.classList.toggle('incorrect', incorrect.has(index));
+    });
+
+    const complete = board.every((row) => row.every((value) => value !== 0));
+    const message = document.getElementById('message');
+    if (complete && incorrect.size === 0) {
+      if (!gameFinished) {
+        stopTimer();
+        gameFinished = true;
+        inputs.forEach((input) => { input.disabled = true; });
+      }
+      message.className = 'success';
+      message.innerText = `Congratulations! You solved it in ${document.getElementById('timer').innerText} with ${hintsUsed} hints used.`;
+    } else {
+      message.className = incorrect.size ? 'error' : '';
+      message.innerText = incorrect.size ? 'Some cells are incorrect.' : 'No incorrect entries found yet.';
     }
+  } catch (error) {
+    showError(error);
   }
-  if (incorrect.size === 0) {
-    msg.className = 'success';
-    msg.innerText = 'Congratulations! You solved it!';
-  } else {
-    msg.className = 'error';
-    msg.innerText = 'Some cells are incorrect.';
+}
+
+async function useHint() {
+  try {
+    const res = await fetch('/hint', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({board: getBoard()})
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Unable to get a hint.');
+    }
+
+    const {row, col, value} = data.hint;
+    const input = document.querySelector(
+      `.sudoku-cell[data-row="${row}"][data-col="${col}"]`
+    );
+    input.value = value;
+    input.readOnly = true;
+    input.classList.add('hint');
+    hintsUsed++;
+    document.getElementById('hints-used').innerText = String(hintsUsed);
+    clearCellFeedback();
+    updateConflicts();
+    document.getElementById('message').innerText = '';
+    document.getElementById('message').className = '';
+  } catch (error) {
+    showError(error);
   }
 }
 
 window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
+  document.getElementById('get-hint').addEventListener('click', useHint);
   newGame();
 });

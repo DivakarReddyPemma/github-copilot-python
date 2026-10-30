@@ -36,6 +36,25 @@ def is_safe(board, row, col, num):
     return True
 
 
+def find_incorrect_cells(board, solution):
+    """Return coordinates of filled cells that differ from the solution."""
+    return [
+        [row, col]
+        for row in range(SIZE)
+        for col in range(SIZE)
+        if board[row][col] != EMPTY and board[row][col] != solution[row][col]
+    ]
+
+
+def find_hint(board, puzzle, solution):
+    """Return the first eligible empty cell and its solution value, if any."""
+    for row in range(SIZE):
+        for col in range(SIZE):
+            if puzzle[row][col] == EMPTY and board[row][col] == EMPTY:
+                return {"row": row, "col": col, "value": solution[row][col]}
+    return None
+
+
 def fill_board(board):
     """Fill an incomplete board with a valid randomized Sudoku solution."""
     for row in range(SIZE):

@@ -76,6 +76,34 @@ def test_is_safe_rejects_values_present_in_row_column_or_box():
     assert not sudoku_logic.is_safe(box_conflict, 0, 0, 5)
 
 
+def test_find_incorrect_cells_ignores_blanks_and_returns_wrong_filled_cells():
+    board = copy.deepcopy(SOLVED_BOARD)
+    board[0][0] = sudoku_logic.EMPTY
+    board[0][1] = 4
+
+    assert sudoku_logic.find_incorrect_cells(board, SOLVED_BOARD) == [[0, 1]]
+
+
+def test_find_hint_returns_correct_value_for_an_empty_non_given_cell():
+    puzzle = copy.deepcopy(SOLVED_BOARD)
+    puzzle[2][4] = sudoku_logic.EMPTY
+    board = copy.deepcopy(puzzle)
+
+    assert sudoku_logic.find_hint(board, puzzle, SOLVED_BOARD) == {
+        "row": 2,
+        "col": 4,
+        "value": SOLVED_BOARD[2][4],
+    }
+
+
+def test_find_hint_skips_filled_cells_and_returns_none_when_no_hint_is_available():
+    puzzle = copy.deepcopy(SOLVED_BOARD)
+    board = copy.deepcopy(puzzle)
+    board[0][0] = sudoku_logic.EMPTY
+
+    assert sudoku_logic.find_hint(board, puzzle, SOLVED_BOARD) is None
+
+
 def test_count_solutions_returns_one_for_a_uniquely_solvable_puzzle():
     puzzle = [
         [5, 3, 0, 0, 7, 0, 0, 0, 0],
